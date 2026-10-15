@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-DATA_PATH = Path(__file__).parent / "data" / "dataset_fiskal_97_hipoFull.csv"
+BASE = Path(__file__).resolve().parent
 ACCENT = "#00D4AA"
 PLOT_TEMPLATE = "plotly_dark"
 
@@ -51,15 +51,40 @@ def label(col: str) -> str:
 # ----------------------------------------------------------------------------
 # Data
 # ----------------------------------------------------------------------------
+def find_csv():
+    """Cari file CSV di folder app.py atau folder data/ (nama file bebas)."""
+    for folder in (BASE, BASE / "data"):
+        if folder.exists():
+            hits = sorted(folder.glob("dataset_fiskal*.csv")) or sorted(folder.glob("*.csv"))
+            if hits:
+                return hits[0]
+    return None
+
+
 @st.cache_data
-def load_data() -> pd.DataFrame:
-    df = pd.read_csv(DATA_PATH)
-    df["Kota"] = df["Kota"].astype(str)
-    df["Nama"] = df["Kota"].str.replace(r"^(Kota|Kabupaten)\s+", "", regex=True)
-    return df
+def read_csv(src) -> pd.DataFrame:
+    return pd.read_csv(src)
 
 
-df_all = load_data()
+csv_path = find_csv()
+if csv_path is not None:
+    raw = read_csv(csv_path)
+else:
+    st.title("📊 Fiscal Insight Indonesia")
+    st.warning("File CSV tidak ditemukan di folder proyek. Upload file dataset di bawah ini.")
+    up = st.file_uploader("Upload dataset_fiskal_97_hipoFull.csv", type="csv")
+    if up is None:
+        st.stop()
+    raw = pd.read_csv(up)
+
+missing = [c for c in ["Kota", "Tahun"] + ALL_NUM if c not in raw.columns]
+if missing:
+    st.error(f"Kolom berikut tidak ada di CSV: {missing}")
+    st.stop()
+
+df_all = raw.copy()
+df_all["Kota"] = df_all["Kota"].astype(str)
+df_all["Nama"] = df_all["Kota"].str.replace(r"^(Kota|Kabupaten)\s+", "", regex=True)
 
 
 # ----------------------------------------------------------------------------
